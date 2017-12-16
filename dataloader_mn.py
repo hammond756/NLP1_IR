@@ -244,7 +244,7 @@ class MemNet(nn.Module):
         
 
 
-# In[683]:
+# In[705]:
 
 
 # Instantiate CBOW here for sentence embeddings:
@@ -257,6 +257,18 @@ OUTPUT_DIM = IMG_SIZE # For simplicity...
 cbow_model = CBOW(vocab_size, EMBEDDING_DIM, OUTPUT_DIM)
 mem_net = MemNet(cbow_model, OUTPUT_DIM, 1)
 max_ent = MaxEnt(cbow_model, vocab_size, IMG_SIZE)
+
+
+# In[706]:
+
+
+if torch.cuda.is_available():
+    print("ya ya")
+    cbow_model = cbow_model.cuda()
+    mem_net = mem_net.cuda()
+    print("cuda ready bitches")
+else:
+    print("no no")
 
 
 # In[684]:
@@ -370,7 +382,7 @@ def predict(model, data):
             correct_top1 += 1
         
         # For top 5:
-        pred = pred.data.numpy().flatten()
+        pred = pred.data.cpu().numpy().flatten()
         top_5 = heapq.nlargest(5, range(len(pred)), pred.__getitem__)
         if target.data[0] in top_5:
             correct_top5 += 1
