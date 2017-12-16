@@ -249,7 +249,7 @@ EMBEDDING_DIM = 100
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*EASY_1000)), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
