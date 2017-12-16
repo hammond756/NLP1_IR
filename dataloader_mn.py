@@ -128,8 +128,8 @@ EMBEDDING_DIM = 5
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*TRAIN_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VALID_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 
@@ -258,85 +258,9 @@ cbow_model = CBOW(vocab_size, EMBEDDING_DIM, OUTPUT_DIM)
 mem_net = MemNet(cbow_model, OUTPUT_DIM, 1)
 max_ent = MaxEnt(cbow_model, vocab_size, IMG_SIZE)
 
-
-# In[684]:
-
-
-# MN SEQUENCE:
-# Best paper + implementation description I was able to find:
-# https://arxiv.org/pdf/1503.08895.pdf
-# Where 'Question' in our case is one of the 10 images (or all 10 in one go).
-
-# NOTE: all variable names are in accordance with section 2.1 from paper URL.
-
-# Trying simple forward prediction. Test if right probabilities are generated:
-
-# Set the number of memory items (1 caption + 10 QA's ):
-dialog, images, target = dialog_data[0]
-x = len(dialog)
-
-for i in images:
-    # Create an empty history matrix, [11 x 2048]
-    m = torch.FloatTensor(x, IMG_SIZE).zero_()
-
-
-    # calculate 'm' features for each exchange, a matrix of size 11 x 2048
-    for idx, sentence in enumerate(dialog):
-        m_i = cbow_model(Variable(sentence))
-        m[idx] = m_i.data
-
-    # m = m.expand()
-    # Preferably find 'u' img features, a matrix of [2048 x 10]. For now just take one image to 
-    # resemble sect. 2.1 as good as possible. u = [2048 x 1]
-    u = i
-
-    # inner product of history matrix and img features, produces 11 x 10 matrix 
-    # but for now 11 x 1 since u = [2048 x 1]
-    p_1 = m @ u
-    p = torch.mm(m, u.unsqueeze(1))
-#     print(p, torch.norm(p))
-    p.div_(torch.norm(p))
-    p_1.div_(torch.norm(p_1))
-    
-#     print(p)
-#     print(p_1)
-
-    # softmax the to get proper proabilities
-    p = F.softmax(p.squeeze())
-    
-#     print(p)
-    
-    o = torch.FloatTensor(x, IMG_SIZE).zero_()
-    # Weighted sum 'o', representation of memory output:
-    # p_i * c_i, where c_i is in our case equal to m_i
-    for idx, p_i in enumerate(p):
-        o[idx] = p_i.data * m[idx]
-
-    o = Variable(torch.sum(o, dim=0))
-#     print(o)
-
-
-    u = Variable(u)
-
-#     print(o)
-
-#     create a "Weight matrix" W:
-#     torch.manual_seed(1)
-    W = nn.Linear(2048, 1)
-
-    # Finally, push u + o:
-#     print(u + o)
-    a = W(u + o)
-    print(a)
-
-
-# In[685]:
-
-
-get_ipython().run_line_magic('time', 'output = mem_net(Variable(dialog), Variable(images))')
-
-print("\nShould be one:\n\n", torch.sum(torch.exp(output)).data.numpy())
-
+if torch.cuda.is_available():
+        cbow_model = cbow_model.cuda()
+        mem_net = mem_net.cuda()
 
 # In[686]:
 
@@ -370,7 +294,7 @@ def predict(model, data):
             correct_top1 += 1
         
         # For top 5:
-        pred = pred.data.numpy().flatten()
+        pred = pred.data.cpu().numpy().flatten()
         top_5 = heapq.nlargest(5, range(len(pred)), pred.__getitem__)
         if target.data[0] in top_5:
             correct_top5 += 1
@@ -394,15 +318,16 @@ def log_to_console(i, n_epochs, batch_size, batch_per_epoch, error, start_time, 
                   error, 
                   processing_speed))
     
-def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count):
+def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count, learningRate):
     timestr = time.strftime("%m-%d-%H-%M")
-    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}.txt".format(label,
+    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}-lr_{}.txt".format(label,
                                                                        training_portion,
                                                                        validation_portion,
                                                                        EMBEDDING_DIM,
                                                                        epochs,
                                                                        timestr,
-                                                                       batch_count)
+                                                                       batch_count,
+                                                                       learningRate)
 
     target_path = ['Training_recordings', filename]
     stats_log = open(os.path.join(*target_path), 'w')
@@ -446,7 +371,7 @@ if logging == True:
                                validation_portion,
                                EMBEDDING_DIM,
                                numEpochs,
-                               batchSize)
+                               batchSize, learningRate)
 
 else:
     print("Logging disabled!")
@@ -491,7 +416,7 @@ for t in range(numEpochs):
             
     offset = (offset + 1) % remainderCount
     print("{:.1f}s:\t Finished epoch. Calculating test error..".format(timer() - startTime))
-    print("{:.1f}s:\t test error: {:.6f}".format(timer() - startTime, validation_error))
+    print("{:.1f}s:\t top_1:\t{:.2f}\t top_5: \t {:.2f} \t test error: {:.6f}".format(timer() - startTime, top_1_score, top_5_score, validation_error))
     continueFromI = 0
 
 if logging == True:
