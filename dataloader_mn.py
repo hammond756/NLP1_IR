@@ -351,7 +351,7 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 model = mem_net
 
 batchSize = 1
-numEpochs = 5
+numEpochs = 25 
 learningRate = 1e-4
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate)
@@ -373,7 +373,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("memory_net", 
+    stats_log, filename = init_stats_log("memory_net_easy", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
@@ -419,13 +419,16 @@ for t in range(numEpochs):
     validation_error = validate(model, valid_data, criterion)
     
     if logging == True:
-        stats_log.write("{}|{}|{}|{}|{}|{}\n".format(epoch, avg_loss, total_loss, validation_error, top_1_score, top_5_score))
-            
+        stats_log.write("{}|{}|{}|{}|{}|{}\n".format(t, avg_loss, total_loss, validation_error, top_1_score, top_5_score))
+    
     offset = (offset + 1) % remainderCount
-    print("{:.1f}s:\t Finished epoch. Calculating test error..".format(timer() - startTime))
-    print("{:.1f}s:\t top_1:\t{:.2f}\t top_5: \t {:.2f} \t test error: {:.6f}".format(timer() - startTime, top_1_score, top_5_score, validation_error))
+    print()
+    print("<--------------->")
+    print("{:.1f}s:\t top-1: \t {:.2f} \t top-5: \t {:.2f} \t test error: {:.6f}".format(timer() - startTime, top_1_score, top_5_score, validation_error))
+    print("<--------------->")
+    print()
     continueFromI = 0
-
+            
 if logging == True:
     stats_log.close()
 
