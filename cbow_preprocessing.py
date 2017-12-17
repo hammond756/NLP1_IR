@@ -239,6 +239,8 @@ class DialogDataset(Dataset):
 SAMPLE_EASY = ['Data', 'sample_easy.json']
 TRAIN_EASY = ['Data', 'Easy', 'IR_train_easy.json']
 EASY_1000 = ['Data', 'Easy', 'IR_train_easy_1000.json']
+TRAIN_HARD = ['Data', 'Hard', 'IR_train_hard.json']
+VALID_HARD = ['Data', 'Hard', 'IR_val_hard.json']
 VAL_200 = ['Data', 'Easy', 'IR_val_easy_200.json']
 VALID_EASY = ['Data', 'Easy', 'IR_val_easy.json']
 IMG_FEATURES = ['Data', 'Features', 'IR_image_features.h5']
@@ -249,8 +251,8 @@ EMBEDDING_DIM = 200
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*TRAIN_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VALID_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 print(len(dialog_data[0:3])) # can now slice this bitch up
@@ -348,11 +350,6 @@ validation_errors = []
 epochs_trained = 0
 
 dialog, images, target = dialog_data[0]
-get_ipython().run_line_magic('time', 'inputs = model.prepare(dialog, images)')
-get_ipython().run_line_magic('time', 'model(Variable(inputs))')
-
-
-# In[7]:
 
 
 def validate(model, data, loss_func):
@@ -436,7 +433,7 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 batch_size = 30 
 numEpochs = 25
 learningRate = 1e-4
-weight_decay = 0.0
+weight_decay = 0.0 
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate, weight_decay=weight_decay)
 
@@ -457,7 +454,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("cbow_pre_easy", 
+    stats_log, filename = init_stats_log("cbow_pre_hard", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
