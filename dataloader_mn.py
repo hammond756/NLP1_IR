@@ -124,7 +124,7 @@ IMG_FEATURES = ['Data', 'Features', 'IR_image_features.h5']
 INDEX_MAP = ['Data', 'Features', 'IR_img_features2id.json']
 
 IMG_SIZE = 2048
-EMBEDDING_DIM = 5
+EMBEDDING_DIM = 512 
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
@@ -213,13 +213,14 @@ class MemNet(nn.Module):
         self.output_dim = output_dim
         self.memory_dim = memory_dim
         
+        self.image_transform = nn.Linear(2048, memory_dim) 
         self.text_module = text_module
         self.linear = nn.Linear(memory_dim, output_dim)
     
     def forward(self, dialog, img_features):
         
 #         scores = torch.FloatTensor(len(img_features)).zero_()
-        
+        img_features = self.image_transform(img_features) 
 #         for i, img_feature in enumerate(img_features):
         history = self.text_module(dialog, batch_size = len(dialog))
         history = history.expand(img_features.size(0), history.size(0), history.size(1))
@@ -252,7 +253,7 @@ class MemNet(nn.Module):
 
 EMBEDDING_DIM = 100
 IMG_SIZE = 2048
-OUTPUT_DIM = IMG_SIZE # For simplicity...
+OUTPUT_DIM = 256
 
 cbow_model = CBOW(vocab_size, EMBEDDING_DIM, OUTPUT_DIM)
 mem_net = MemNet(cbow_model, OUTPUT_DIM, 1)
@@ -352,9 +353,9 @@ model = mem_net
 
 batchSize = 1
 numEpochs = 25 
-learningRate = 1e-4
+learningRate = 1e-5
 criterion = nn.NLLLoss()
-optimizer = optim.Adam(model.parameters(), lr=learningRate)
+optimizer = optim.Adam(model.parameters(), lr=learningRate, weight_decay=0.3)
 
 startTime = timer()
 lastPrintTime = startTime
@@ -373,7 +374,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("memory_net_easy", 
+    stats_log, filename = init_stats_log("memory_net_easy_weightdecay0.7", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
