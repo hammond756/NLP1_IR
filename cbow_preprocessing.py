@@ -1,7 +1,7 @@
 
 # coding: utf-8
 
-# In[ ]:
+# In[1]:
 
 
 # source: https://www.daniweb.com/programming/software-development/code/216839/number-to-word-converter-python
@@ -85,7 +85,7 @@ def digits_to_text(document):
     return digits_to_text
 
 
-# In[ ]:
+# In[2]:
 
 
 import torch
@@ -233,7 +233,7 @@ class DialogDataset(Dataset):
             return dialog, img_features, target
 
 
-# In[ ]:
+# In[3]:
 
 
 SAMPLE_EASY = ['Data', 'sample_easy.json']
@@ -249,14 +249,14 @@ EMBEDDING_DIM = 100
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*TRAIN_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VALID_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 print(len(dialog_data[0:3])) # can now slice this bitch up
 
 
-# In[ ]:
+# In[4]:
 
 
 import torch.autograd as autograd
@@ -289,7 +289,7 @@ class CBOW(torch.nn.Module):
         return out
 
 
-# In[ ]:
+# In[5]:
 
 
 class MaxEnt(torch.nn.Module):
@@ -298,7 +298,8 @@ class MaxEnt(torch.nn.Module):
         super(MaxEnt, self).__init__()
 
         self.text_module = text_module
-        self.linear = nn.Linear(text_dim + img_size, 1)
+        self.linear = nn.Linear(text_dim + img_size, 128)
+        self.linear2 = nn.Linear(128, 1)
         self.softmax = nn.LogSoftmax()
         
     def prepare (self, dialog, imgFeatures):
@@ -318,12 +319,14 @@ class MaxEnt(torch.nn.Module):
         return Variable(inputs), Variable(targets)
         
     def forward(self, inp, batch_size=1):
-        scores = self.linear(inp).view(batch_size, -1)
+        scores = self.linear(inp)
+        scores = F.relu(scores)
+        scores = self.linear2(scores).view(batch_size, -1)
         scores = self.softmax(scores)
         return scores
 
 
-# In[ ]:
+# In[6]:
 
 
 TEXT_DIM = 512
@@ -344,7 +347,7 @@ validation_errors = []
 epochs_trained = 0
 
 
-# In[ ]:
+# In[7]:
 
 
 def validate(model, data, loss_func):
@@ -386,10 +389,10 @@ def predict(model, data):
     
     return correct_top1 / len(data), correct_top5 / len(data)
 
-validate(model, valid_data[:100], nn.NLLLoss())
+validate(model, valid_data, nn.NLLLoss())
 
 
-# In[ ]:
+# In[10]:
 
 
 def log_to_console(i, n_epochs, batch_size, batch_per_epoch, error, start_time, processing_speed):
@@ -402,15 +405,16 @@ def log_to_console(i, n_epochs, batch_size, batch_per_epoch, error, start_time, 
                   error, 
                   processing_speed))
     
-def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count):
+def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count, learning_rate):
     timestr = time.strftime("%m-%d-%H-%M")
-    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}.txt".format(label,
+    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}-lr_{}.txt".format(label,
                                                                        training_portion,
                                                                        validation_portion,
                                                                        EMBEDDING_DIM,
                                                                        epochs,
                                                                        timestr,
-                                                                       batch_count)
+                                                                       batch_count,
+                                                                       learning_rate)
 
     target_path = ['Training_recordings', filename]
     stats_log = open(os.path.join(*target_path), 'w')
@@ -421,12 +425,12 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
     
 
 
-# In[ ]:
+# In[15]:
 
 
-batch_size = 30
-numEpochs = 100
-learningRate = 1e-3
+batch_size = 10
+numEpochs = 25
+learningRate = 1e-4
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate)
 
@@ -452,7 +456,8 @@ if logging == True:
                                validation_portion,
                                EMBEDDING_DIM,
                                numEpochs,
-                               batch_size)
+                               batch_size,
+                               learningRate)
 
 else:
     print("Logging disabled!")
@@ -506,12 +511,12 @@ for t in range(numEpochs):
             
     epochs_trained += 1
     offset = (offset + 1) % remainderCount
-    print("{:.1f}s:\t test error: {:.6f}".format(timer() - start_time, validation_error))
+    print()
+    print("<--------------->")
+    print("{:.1f}s:\t top-1: \t {:.2f} \t top-5: \t {:.2f} \t test error: {:.6f}".format(timer() - start_time, top_1_score, top_5_score, validation_error))
+    print("<--------------->")
+    print()
     continueFromI = 0
-    if epochs_trained % 10 == 0:
-        fileName = "maxent_{}batch_{}epc.pt".format(batch_size, epochs_trained)
-        torch.save(model.state_dict(), fileName)
-        print("saved\t", fileName)
 
 for i in range(batch_size):
     dialog, image, target = dialog_data[i]
