@@ -249,7 +249,6 @@ INDEX_MAP = ['Data', 'Features', 'IR_img_features2id.json']
 IMG_SIZE = 2048
 EMBEDDING_DIM = 200 
 
-torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 dialog_data = DialogDataset(os.path.join(*TRAIN_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 valid_data = DialogDataset(os.path.join(*VALID_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
