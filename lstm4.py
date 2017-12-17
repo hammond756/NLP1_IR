@@ -447,11 +447,9 @@ def validate(model, data, loss_func):
     for i, item in data.iterrows():
         inputs, target = model.prepare(item)
         pred = model(inputs, len(item.img_features))
-        print(pred)
         pred = pred[:,-1].unsqueeze(0)
         loss = loss_func(pred, target)
         total_loss += loss.data[0]
-        break
     return total_loss / len(data)
 
 def predict(model, data):
@@ -517,8 +515,8 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 
 
 batch_size = 1 # batching is not possible with LSTM model since we use batching for different images
-numEpochs = 100
-learningRate = 1e-2
+numEpochs = 25
+learningRate = 1e-4
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate)
 
@@ -538,7 +536,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("test_top1_top2", 
+    stats_log, filename = init_stats_log("lstm-v1-lr_0.0001", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
@@ -610,7 +608,8 @@ for i in range(batch_size):
 
 if logging == True:
     stats_log.close()
-
+    path = os.join.path(*['saved_models', filename + '.h5'])
+    torch.save(model.state_dict(), path)
 
 # In[ ]:
 
