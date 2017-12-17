@@ -97,16 +97,14 @@ EASY_1000 = ['Data', 'Easy', 'IR_train_easy_1000.json']
 VALID_EASY = ['Data', 'Easy', 'IR_val_easy.json']
 IMG_FEATURES = ['Data', 'Features', 'IR_image_features.h5']
 INDEX_MAP = ['Data', 'Features', 'IR_img_features2id.json']
-TRAIN_HARD = ['Data', 'Hard', 'IR_train_hard.json']
-VALID_HARD = ['Data', 'Hard', 'IR_val_hard.json']
 
 IMG_SIZE = 2048
 EMBEDDING_DIM = 50
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*TRAIN_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VALID_HARD), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*TRAIN_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VALID_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 
@@ -239,7 +237,7 @@ def predict(model, data):
             correct_top1 += 1
         
         # For top 5:
-        pred = pred.data.cpu().numpy().flatten()
+        pred = pred.data.numpy().flatten()
         top_5 = heapq.nlargest(5, range(len(pred)), pred.__getitem__)
         if target.data[0] in top_5:
             correct_top5 += 1
@@ -286,9 +284,9 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 # In[ ]:
 
 
-batchSize = 30
+batchSize = 10
 numEpochs = 25
-learningRate = 1e-5
+learningRate = 1e-4
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate)
 
@@ -309,7 +307,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("naive_cbow_hard", 
+    stats_log, filename = init_stats_log("naive_cbow", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
