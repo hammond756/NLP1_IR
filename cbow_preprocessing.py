@@ -348,9 +348,6 @@ validation_errors = []
 epochs_trained = 0
 
 
-# In[7]:
-
-
 def validate(model, data, loss_func):
     total_loss = 0
     
@@ -432,7 +429,7 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 batch_size = 30 
 numEpochs = 25
 learningRate = 1e-4
-weight_decay = 0.0
+weight_decay = 1e-6 
 criterion = nn.NLLLoss()
 optimizer = optim.Adam(model.parameters(), lr=learningRate, weight_decay=weight_decay)
 
@@ -453,7 +450,7 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("cbow_pre_easy", 
+    stats_log, filename = init_stats_log("l2reg_cbow_pre_easy", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
