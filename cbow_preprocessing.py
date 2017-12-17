@@ -249,8 +249,8 @@ EMBEDDING_DIM = 200
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*TRAIN_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VALID_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 print(len(dialog_data[0:3])) # can now slice this bitch up
@@ -346,6 +346,10 @@ else:
 training_errors = []
 validation_errors = []
 epochs_trained = 0
+
+dialog, images, target = dialog_data[0]
+get_ipython().run_line_magic('time', 'inputs = model.prepare(dialog, images)')
+get_ipython().run_line_magic('time', 'model(Variable(inputs))')
 
 
 # In[7]:
