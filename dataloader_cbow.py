@@ -97,9 +97,11 @@ EASY_1000 = ['Data', 'Easy', 'IR_train_easy_1000.json']
 VALID_EASY = ['Data', 'Easy', 'IR_val_easy.json']
 IMG_FEATURES = ['Data', 'Features', 'IR_image_features.h5']
 INDEX_MAP = ['Data', 'Features', 'IR_img_features2id.json']
+TRAIN_HARD = ['Data', 'Hard', 'IR_train_hard.json']
+VALID_HARD = ['Data', 'Hard', 'IR_val_hard.json']
 
 IMG_SIZE = 2048
-EMBEDDING_DIM = 50
+EMBEDDING_DIM = 200 
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
@@ -149,12 +151,12 @@ class CBOW(torch.nn.Module):
 
 class MaxEnt(torch.nn.Module):
     
-    def __init__(self, text_module, text_dim, img_size):
+    def __init__(self, text_module, text_dim, img_size, hidden_units):
         super(MaxEnt, self).__init__()
 
         self.text_module = text_module
-        self.linear = nn.Linear(text_dim + img_size, 128)
-        self.linear2 = nn.Linear(128, 1)
+        self.linear = nn.Linear(text_dim + img_size, hidden_units)
+        self.linear2 = nn.Linear(hidden_units, 1)
         self.softmax = nn.LogSoftmax()
         
     def prepare (self, dialog, imgFeatures):
@@ -185,9 +187,10 @@ class MaxEnt(torch.nn.Module):
 
 
 TEXT_DIM = 512
+HIDDEN_UNITS_MAXENT = 1024
 
 cbow_model = CBOW(vocab_size, EMBEDDING_DIM, TEXT_DIM)
-model = MaxEnt(cbow_model, TEXT_DIM, IMG_SIZE)
+model = MaxEnt(cbow_model, TEXT_DIM, IMG_SIZE, HIDDEN_UNITS_MAXENT)
 
 if torch.cuda.is_available():
     print("ya ya")
@@ -237,7 +240,7 @@ def predict(model, data):
             correct_top1 += 1
         
         # For top 5:
-        pred = pred.data.numpy().flatten()
+        pred = pred.data.cpu().numpy().flatten()
         top_5 = heapq.nlargest(5, range(len(pred)), pred.__getitem__)
         if target.data[0] in top_5:
             correct_top5 += 1
@@ -261,16 +264,16 @@ def log_to_console(i, n_epochs, batch_size, batch_per_epoch, error, start_time):
                   error, 
                   avgProcessingSpeed))
     
-def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count, learning_rate):
+def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count, learning_rate, weight_dec, hidden):
     timestr = time.strftime("%m-%d-%H-%M")
-    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}-lr_{}.txt".format(label,
+    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}-lr_{}-wd_{}-hidden_{}.txt".format(label,
                                                                        training_portion,
                                                                        validation_portion,
                                                                        EMBEDDING_DIM,
                                                                        epochs,
                                                                        timestr,
                                                                        batch_count,
-                                                                       learning_rate)
+                                                                       learning_rate, weight_dec, hidden)
 
     target_path = ['Training_recordings', filename]
     stats_log = open(os.path.join(*target_path), 'w')
@@ -284,11 +287,12 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 # In[ ]:
 
 
-batchSize = 10
+batchSize = 30
 numEpochs = 25
 learningRate = 1e-4
+weight_decay = 0.0 
 criterion = nn.NLLLoss()
-optimizer = optim.Adam(model.parameters(), lr=learningRate)
+optimizer = optim.Adam(model.parameters(), lr=learningRate, weight_decay=weight_decay)
 
 startTime = time.time()
 lastPrintTime = startTime
@@ -307,13 +311,13 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("naive_cbow", 
+    stats_log, filename = init_stats_log("naive_cbow_easy", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
                                numEpochs,
                                batchSize,
-                               learningRate)
+                               learningRate, weight_decay, HIDDEN_UNITS_MAXENT)
 
 else:
     print("Logging disabled!")
@@ -376,50 +380,6 @@ for t in range(numEpochs):
 
 if logging == True:
     stats_log.close()
-
-
-# In[59]:
-
-
-import matplotlib.pyplot as plt
-
-def draw_graph(filename):
-    
-    
-    # Read file and data
-    with open("Training_recordings/" + filename, 'r') as f:
-        data = [x.strip() for x in f.readlines()] 
-    
-    data = np.array([line.split("|") for line in data[1:]]).T
-    
-    epochs, avg_loss, total_loss, val_error, correct_top_1, correct_top_5 = data
-    
-    epochs = np.array(epochs, dtype=np.int8)
-    
-    plt.subplot(4, 1, 1)
-    plt.plot(epochs, np.array(avg_loss, dtype=np.float32), '.-')
-    plt.title('average loss, validation error and correct predictions')
-    plt.ylabel('Average\nLoss')
-    plt.xlabel('Epochs')
-
-    plt.subplot(4, 1, 2)
-    plt.plot(epochs, np.array(val_error, dtype=np.float32), '-')
-    plt.ylabel('Validation\nLoss')
-    plt.xlabel('Epochs')
-
-    plt.subplot(4, 1, 3)
-    plt.plot(epochs, np.array(correct_top_1, dtype=np.int8), '-')
-    plt.ylabel('Correct\ntop 1')
-    plt.xlabel('Epochs')
-
-    plt.subplot(4, 1, 4)
-    plt.plot(epochs, np.array(correct_top_5, dtype=np.int8), '-')
-    plt.ylabel('Correct\ntop 5')
-    plt.xlabel('Epochs')
-
-    
-    
-    plt.show()
-
-draw_graph(filename)
+    path = os.path.join(*['saved_models', filename + '.h5'])
+    torch.save(model.state_dict(), path) 
 

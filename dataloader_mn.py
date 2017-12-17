@@ -124,12 +124,12 @@ IMG_FEATURES = ['Data', 'Features', 'IR_image_features.h5']
 INDEX_MAP = ['Data', 'Features', 'IR_img_features2id.json']
 
 IMG_SIZE = 2048
-EMBEDDING_DIM = 5
+EMBEDDING_DIM = 512 
 
 torch.manual_seed(1)
 # dialog_data = DialogDataset(os.path.join(*SAMPLE_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-dialog_data = DialogDataset(os.path.join(*EASY_1000), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
-valid_data = DialogDataset(os.path.join(*VAL_200), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+dialog_data = DialogDataset(os.path.join(*TRAIN_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
+valid_data = DialogDataset(os.path.join(*VALID_EASY), os.path.join(*IMG_FEATURES), os.path.join(*INDEX_MAP))
 
 vocab_size = len(dialog_data.vocab)
 
@@ -213,13 +213,14 @@ class MemNet(nn.Module):
         self.output_dim = output_dim
         self.memory_dim = memory_dim
         
+        self.image_transform = nn.Linear(2048, memory_dim) 
         self.text_module = text_module
         self.linear = nn.Linear(memory_dim, output_dim)
     
     def forward(self, dialog, img_features):
         
 #         scores = torch.FloatTensor(len(img_features)).zero_()
-        
+        img_features = self.image_transform(img_features) 
 #         for i, img_feature in enumerate(img_features):
         history = self.text_module(dialog, batch_size = len(dialog))
         history = history.expand(img_features.size(0), history.size(0), history.size(1))
@@ -252,12 +253,11 @@ class MemNet(nn.Module):
 
 EMBEDDING_DIM = 100
 IMG_SIZE = 2048
-OUTPUT_DIM = IMG_SIZE # For simplicity...
+OUTPUT_DIM = 256
 
 cbow_model = CBOW(vocab_size, EMBEDDING_DIM, OUTPUT_DIM)
 mem_net = MemNet(cbow_model, OUTPUT_DIM, 1)
 max_ent = MaxEnt(cbow_model, vocab_size, IMG_SIZE)
-
 
 # In[706]:
 
@@ -271,86 +271,6 @@ else:
     print("no no")
 
 
-# In[684]:
-
-
-# MN SEQUENCE:
-# Best paper + implementation description I was able to find:
-# https://arxiv.org/pdf/1503.08895.pdf
-# Where 'Question' in our case is one of the 10 images (or all 10 in one go).
-
-# NOTE: all variable names are in accordance with section 2.1 from paper URL.
-
-# Trying simple forward prediction. Test if right probabilities are generated:
-
-# Set the number of memory items (1 caption + 10 QA's ):
-dialog, images, target = dialog_data[0]
-x = len(dialog)
-
-for i in images:
-    # Create an empty history matrix, [11 x 2048]
-    m = torch.FloatTensor(x, IMG_SIZE).zero_()
-
-
-    # calculate 'm' features for each exchange, a matrix of size 11 x 2048
-    for idx, sentence in enumerate(dialog):
-        m_i = cbow_model(Variable(sentence))
-        m[idx] = m_i.data
-
-    # m = m.expand()
-    # Preferably find 'u' img features, a matrix of [2048 x 10]. For now just take one image to 
-    # resemble sect. 2.1 as good as possible. u = [2048 x 1]
-    u = i
-
-    # inner product of history matrix and img features, produces 11 x 10 matrix 
-    # but for now 11 x 1 since u = [2048 x 1]
-    p_1 = m @ u
-    p = torch.mm(m, u.unsqueeze(1))
-#     print(p, torch.norm(p))
-    p.div_(torch.norm(p))
-    p_1.div_(torch.norm(p_1))
-    
-#     print(p)
-#     print(p_1)
-
-    # softmax the to get proper proabilities
-    p = F.softmax(p.squeeze())
-    
-#     print(p)
-    
-    o = torch.FloatTensor(x, IMG_SIZE).zero_()
-    # Weighted sum 'o', representation of memory output:
-    # p_i * c_i, where c_i is in our case equal to m_i
-    for idx, p_i in enumerate(p):
-        o[idx] = p_i.data * m[idx]
-
-    o = Variable(torch.sum(o, dim=0))
-#     print(o)
-
-
-    u = Variable(u)
-
-#     print(o)
-
-#     create a "Weight matrix" W:
-#     torch.manual_seed(1)
-    W = nn.Linear(2048, 1)
-
-    # Finally, push u + o:
-#     print(u + o)
-    a = W(u + o)
-    print(a)
-
-
-# In[685]:
-
-
-get_ipython().run_line_magic('time', 'output = mem_net(Variable(dialog), Variable(images))')
-
-print("\nShould be one:\n\n", torch.sum(torch.exp(output)).data.numpy())
-
-
-# In[686]:
 
 
 def validate(model, data, loss_func):
@@ -406,15 +326,16 @@ def log_to_console(i, n_epochs, batch_size, batch_per_epoch, error, start_time, 
                   error, 
                   processing_speed))
     
-def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count):
+def init_stats_log(label, training_portion, validation_portion, embeddings_dim, epochs, batch_count, learningRate):
     timestr = time.strftime("%m-%d-%H-%M")
-    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}.txt".format(label,
+    filename = "{}-t_size_{}-v_size_{}-emb_{}-eps_{}-dt_{}-batch_{}-lr_{}.txt".format(label,
                                                                        training_portion,
                                                                        validation_portion,
                                                                        EMBEDDING_DIM,
                                                                        epochs,
                                                                        timestr,
-                                                                       batch_count)
+                                                                       batch_count,
+                                                                       learningRate)
 
     target_path = ['Training_recordings', filename]
     stats_log = open(os.path.join(*target_path), 'w')
@@ -431,10 +352,10 @@ def init_stats_log(label, training_portion, validation_portion, embeddings_dim, 
 model = mem_net
 
 batchSize = 1
-numEpochs = 5
-learningRate = 1e-4
+numEpochs = 25 
+learningRate = 1e-5
 criterion = nn.NLLLoss()
-optimizer = optim.Adam(model.parameters(), lr=learningRate)
+optimizer = optim.Adam(model.parameters(), lr=learningRate, weight_decay=0.3)
 
 startTime = timer()
 lastPrintTime = startTime
@@ -453,12 +374,12 @@ training_portion = len(dialog_data)
 validation_portion = len(valid_data)
 
 if logging == True:
-    stats_log, filename = init_stats_log("memory_net", 
+    stats_log, filename = init_stats_log("memory_net_easy_weightdecay0.7", 
                                training_portion,
                                validation_portion,
                                EMBEDDING_DIM,
                                numEpochs,
-                               batchSize)
+                               batchSize, learningRate)
 
 else:
     print("Logging disabled!")
@@ -499,13 +420,16 @@ for t in range(numEpochs):
     validation_error = validate(model, valid_data, criterion)
     
     if logging == True:
-        stats_log.write("{}|{}|{}|{}|{}|{}\n".format(epoch, avg_loss, total_loss, validation_error, top_1_score, top_5_score))
-            
+        stats_log.write("{}|{}|{}|{}|{}|{}\n".format(t, avg_loss, total_loss, validation_error, top_1_score, top_5_score))
+    
     offset = (offset + 1) % remainderCount
-    print("{:.1f}s:\t Finished epoch. Calculating test error..".format(timer() - startTime))
-    print("{:.1f}s:\t test error: {:.6f}".format(timer() - startTime, validation_error))
+    print()
+    print("<--------------->")
+    print("{:.1f}s:\t top-1: \t {:.2f} \t top-5: \t {:.2f} \t test error: {:.6f}".format(timer() - startTime, top_1_score, top_5_score, validation_error))
+    print("<--------------->")
+    print()
     continueFromI = 0
-
+            
 if logging == True:
     stats_log.close()
 
